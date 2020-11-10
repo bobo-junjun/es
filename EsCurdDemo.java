@@ -1,9 +1,11 @@
 package com.bigdata.es;
 
 
+import com.alibaba.fastjson.JSONObject;
 import io.netty.util.Mapping;
 import org.elasticsearch.action.admin.indices.create.CreateIndexResponse;
 import org.elasticsearch.action.admin.indices.exists.indices.IndicesExistsResponse;
+import org.elasticsearch.action.index.IndexResponse;
 import org.elasticsearch.action.search.SearchRequestBuilder;
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.action.support.master.AcknowledgedResponse;
@@ -97,35 +99,97 @@ public class EsCurdDemo {
     }
 
     /**
-     * 设置元数据信息
+     * 设置元数据信息 方法
      * @param indexName     数据库
      * @param typeName      表名
      * @param mapping       元数据
      */
-    public void setMapping(String indexName, String typeName, XContentType mapping) {
+    public void setMapping(String indexName, String typeName, String mapping) {
         getAdminClient().preparePutMapping(indexName).setType(typeName)
                 .setSource(mapping, XContentType.JSON).get();
     }
 
+
+    /**
+     * 设置元数据JSON格式
+     */
+    public static void setMappingTest(){
+//        这是三层嵌套的json格式
+       JSONObject mapping = new JSONObject();
+       JSONObject properties = new JSONObject();
+//      设置每个字段
+       JSONObject idJSON = new JSONObject();
+       idJSON.put("type", "keyword");
+       idJSON.put("store", "true");
+       properties.put("id", idJSON);
+
+       JSONObject nameJSON = new JSONObject();
+       nameJSON.put("type", "keyword");
+       properties.put("name", nameJSON);
+
+       JSONObject uidJSON = new JSONObject();
+       uidJSON.put("type", "keyword");
+//       store：是否单独设置此字段的存储是否从_source字段中分离，只能搜索，不能获取值
+       uidJSON.put("store", "false");
+       properties.put("name", uidJSON);
+
+       JSONObject hotelJSON = new JSONObject();
+       hotelJSON.put("type", "text");
+       properties.put("name", hotelJSON);
+
+       JSONObject happendDate = new JSONObject();
+       happendDate.put("type", "date");
+       happendDate.put("format", "yyyy-MM-dd");
+       properties.put("name", happendDate);
+
+       mapping.put("properties",properties);
+       EsCurdDemo esCurdDemo = new EsCurdDemo();
+       esCurdDemo.setMapping("test_index1","test1",mapping.toString());
+
+   }
+
+
+    /**
+     *
+     * @param index     索引（数据库）
+     * @param type      类型（表名）
+     * @param id        id
+     * @param source
+     * @return
+     */
+   public long addDoc(String index,String type,String id,Map<String,Object> source){
+       IndexResponse indexResponse = getClient().prepareIndex(index, type, id).setSource(source).get();
+       return indexResponse.getVersion();
+   }
+
+
+
+    /**
+     * 查询文档
+     * @param text
+     * @return
+     */
     public List<Map<String,Object>> queryStringQuery(String text){
         QueryStringQueryBuilder match = QueryBuilders.queryStringQuery(text);
-        SearchRequestBuilder search = getClient().prepareSearch().setQuery(match);
+//        这里可以指定索引名称，不指定默认是所有
+        SearchRequestBuilder search = getClient().prepareSearch("movie_index").setQuery(match);
         SearchResponse response = search.get();
 //        命中的文档
         SearchHits hits = response.getHits();
 //        命中文档的数量
         long totalHits = hits.getTotalHits();
+//        命中文档的内容
         SearchHit[] searchHits = hits.getHits();
         ArrayList<Map<String,Object>> maps = new ArrayList();
         for (SearchHit hit : searchHits) {
-//            文档元数据
+//            文档索引
             String index = hit.getIndex();
+//            文档的数据
             Map<String, Object> sourceAsMap = hit.getSourceAsMap();
             maps.add(sourceAsMap);
         }
         return maps;
     }
-
 
     public static void main(String[] args) {
         EsCurdDemo esCurdDemo = new EsCurdDemo();
@@ -137,9 +201,17 @@ public class EsCurdDemo {
 //        System.out.println(esCurdDemo.isExistsIndex("test_index2"));
 //        System.out.println(esCurdDemo.createIndex("test_index1"));
 
-        esCurdDemo.setMapping("test_index1","test1",XContentType.JSON);
+//        esCurdDemo.setMapping("test_index1","test1",XContentType.JSON);
 
+//        setMappingTest();
 
+//
+
+//        List<Map<String, Object>> queryText = esCurdDemo.queryStringQuery("river");
+//        System.out.println(queryText);
+//      [{doubanScore=8.0, name=operation meigong river, actorList=[{name=zhang han yu, id=3}], id=2}]
+
+//            esCurdDemo.addDoc("test_index2","test2",3,"[{doubanScore=8.0, name=operation meigong river, actorList=[{name=zhang han yu, id=3}], id=2}]");
 
     }
 }
